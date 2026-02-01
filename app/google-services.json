@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "382448867752",
+    "firebase_url": "https://travelalarm-8590c-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "travelalarm-8590c",
+    "storage_bucket": "travelalarm-8590c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:382448867752:android:360bbeb4a8e206886e259d",
+        "android_client_info": {
+          "package_name": "com.travelapp.alarm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEtE8dUe611VBr3WnsdRHjpgtz7U-476Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
