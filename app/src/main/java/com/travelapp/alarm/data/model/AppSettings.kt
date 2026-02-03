@@ -1,8 +1,5 @@
 package com.travelapp.alarm.data.model
 
-/**
- * Performance modes for battery optimization
- */
 enum class PerformanceMode {
     HIGH_PERFORMANCE,
     BALANCED,
@@ -10,16 +7,10 @@ enum class PerformanceMode {
     ULTRA_SAVER
 }
 
-/**
- * Map style options
- */
 enum class MapStyle {
     DEFAULT, SATELLITE, TERRAIN, HYBRID, DARK, LIGHT
 }
 
-/**
- * Distance and speed units
- */
 enum class DistanceUnit {
     KILOMETERS, MILES, METERS
 }
@@ -28,11 +19,7 @@ enum class SpeedUnit {
     KMH, MPH, MS
 }
 
-/**
- * Comprehensive app settings - Everything is customizable!
- */
 data class AppSettings(
-    // === CORE FEATURES ===
     val locationBasedAlarm: Boolean = true,
     val timeBasedAlarm: Boolean = true,
     val contactNotifications: Boolean = true,
@@ -44,7 +31,6 @@ data class AppSettings(
     val routeTracking: Boolean = true,
     val tripHistory: Boolean = true,
 
-    // === NOTIFICATIONS ===
     val notificationsEnabled: Boolean = true,
     val notificationSound: Boolean = true,
     val notificationVibration: Boolean = true,
@@ -81,7 +67,6 @@ data class AppSettings(
     val quietHoursStart: String = "22:00",
     val quietHoursEnd: String = "07:00",
 
-    // === LOCATION & TRACKING ===
     val locationTrackingEnabled: Boolean = true,
     val highAccuracyMode: Boolean = true,
     val backgroundTracking: Boolean = true,
@@ -102,7 +87,6 @@ data class AppSettings(
     val cacheLocationsOffline: Boolean = true,
     val syncWhenOnline: Boolean = true,
 
-    // === COMMUNICATION ===
     val chatEnabled: Boolean = true,
     val chatNotificationSound: Boolean = true,
     val typingIndicator: Boolean = true,
@@ -129,7 +113,6 @@ data class AppSettings(
     val callOnArrival: Boolean = false,
     val callOnCriticalBattery: Boolean = true,
 
-    // === BATTERY & PERFORMANCE ===
     val performanceMode: PerformanceMode = PerformanceMode.BALANCED,
     val batterySaverMode: Boolean = false,
     val autoEnableBatterySaver: Boolean = true,
@@ -148,7 +131,6 @@ data class AppSettings(
     val warnBeforeLowBattery: Boolean = true,
     val batteryWarningThreshold: Int = 25,
 
-    // === PRIVACY & SECURITY ===
     val collectLocationHistory: Boolean = true,
     val collectAnalytics: Boolean = false,
     val collectCrashReports: Boolean = true,
@@ -160,7 +142,6 @@ data class AppSettings(
     val biometricAuth: Boolean = false,
     val encryptLocalData: Boolean = false,
 
-    // === DISPLAY & UI ===
     val darkMode: Boolean = false,
     val autoDarkMode: Boolean = true,
     val mapStyle: MapStyle = MapStyle.DEFAULT,
@@ -184,9 +165,6 @@ data class AppSettings(
     val version: Int = 1
 ) {
 
-    /**
-     * Get estimated battery drain per hour
-     */
     fun getEstimatedBatteryDrainPerHour(): Int {
         var drain = when (performanceMode) {
             PerformanceMode.HIGH_PERFORMANCE -> 15
@@ -204,9 +182,6 @@ data class AppSettings(
         return drain.coerceAtLeast(1)
     }
 
-    /**
-     * Check if a feature is enabled
-     */
     fun isFeatureEnabled(feature: String): Boolean {
         return when (feature) {
             "location_alarm" -> locationBasedAlarm
@@ -218,9 +193,6 @@ data class AppSettings(
         }
     }
 
-    /**
-     * Get update interval based on battery level
-     */
     fun getUpdateInterval(batteryLevel: Int): Int {
         return when {
             batterySaverMode && batteryLevel <= batterySaverThreshold -> lowBatteryUpdateInterval

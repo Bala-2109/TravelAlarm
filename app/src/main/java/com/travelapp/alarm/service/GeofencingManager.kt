@@ -1,99 +1,81 @@
 package com.travelapp.alarm.service
 
-import android.annotation.SuppressLint
+import android.Manifest
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
 import com.google.android.gms.location.GeofencingRequest
 import com.google.android.gms.location.LocationServices
-import com.travelapp.alarm.data.model.Checkpoint
 import com.travelapp.alarm.data.model.LatLng
 import com.travelapp.alarm.data.model.Trip
 
-/**
- * Manages geofences for location-based alarms and checkpoints
- */
 class GeofencingManager(private val context: Context) {
-    
-    companion object {
-        private const val TAG = "GeofencingManager"
-        const val GEOFENCE_EXPIRATION_DURATION = 12 * 60 * 60 * 1000L // 12 hours
-        
-        // Geofence IDs
-        private const val ALARM_GEOFENCE_PREFIX = "alarm_"
-        private const val CHECKPOINT_GEOFENCE_PREFIX = "checkpoint_"
-        private const val DESTINATION_GEOFENCE_PREFIX = "destination_"
-    }
-    
+
     private val geofencingClient: GeofencingClient = LocationServices.getGeofencingClient(context)
-    private val activeGeofences = mutableSetOf<String>()
-    
-    /**
-     * Set up geofences for a trip
-     */
-    @SuppressLint("MissingPermission")
+    private val TAG = "GeofencingManager"
+
+    companion object {
+        const val GEOFENCE_DESTINATION_ALARM = "geofence_destination_alarm"
+        const val GEOFENCE_DESTINATION_NOTIFY = "geofence_destination_notify"
+        const val GEOFENCE_CHECKPOINT_PREFIX = "geofence_checkpoint_"
+    }
+
     fun setupTripGeofences(trip: Trip) {
-        Log.d(TAG, "Setting up geofences for trip: ${trip.id}")
-        
-        // Clear existing geofences for this trip
-        clearTripGeofences(trip.id)
-        
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.d(TAG, "📍 SETTING UP GEOFENCES FOR TRIP: ${trip.id}")
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         val geofences = mutableListOf<Geofence>()
-        
-        // 1. Main alarm geofence (larger radius)
-        geofences.add(createGeofence(
-            id = "${ALARM_GEOFENCE_PREFIX}${trip.id}",
+
+        val alarmGeofence = createGeofence(
+            id = "${GEOFENCE_DESTINATION_ALARM}_${trip.id}",
             location = trip.currentDestination,
             radius = trip.alarmRadius,
             transitionTypes = Geofence.GEOFENCE_TRANSITION_ENTER
-        ))
-        
-        // 2. Destination notification geofence (smaller radius)
-        geofences.add(createGeofence(
-            id = "${DESTINATION_GEOFENCE_PREFIX}${trip.id}",
+        )
+        geofences.add(alarmGeofence)
+        Log.d(TAG, "✅ Created ALARM geofence: ${trip.currentDestination} (${trip.alarmRadius}m)")
+
+        val notifyGeofence = createGeofence(
+            id = "${GEOFENCE_DESTINATION_NOTIFY}_${trip.id}",
             location = trip.currentDestination,
             radius = trip.notificationRadius,
             transitionTypes = Geofence.GEOFENCE_TRANSITION_ENTER
-        ))
-        
-        // 3. Checkpoint geofences
+        )
+        geofences.add(notifyGeofence)
+        Log.d(TAG, "✅ Created NOTIFY geofence: ${trip.currentDestination} (${trip.notificationRadius}m)")
+
         trip.checkpoints.forEach { checkpoint ->
             if (checkpoint.notifyOnEntry && !checkpoint.hasBeenReached) {
-                geofences.add(createCheckpointGeofence(trip.id, checkpoint))
+                val checkpointGeofence = createGeofence(
+                    id = "${GEOFENCE_CHECKPOINT_PREFIX}${checkpoint.id}",
+                    location = checkpoint.location,
+                    radius = checkpoint.radius,
+                    transitionTypes = Geofence.GEOFENCE_TRANSITION_ENTER
+                )
+                geofences.add(checkpointGeofence)
+                Log.d(TAG, "✅ Created CHECKPOINT geofence: ${checkpoint.name} at ${checkpoint.location} (${checkpoint.radius}m)")
             }
         }
-        
-        // Add geofences
-        if (geofences.isNotEmpty()) {
-            addGeofences(geofences)
-        }
-        
-        Log.d(TAG, "Set up ${geofences.size} geofences for trip ${trip.id}")
+
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.d(TAG, "Total geofences to add: ${geofences.size}")
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        addGeofences(geofences, trip.id)
     }
-    
-    /**
-     * Create a geofence for a checkpoint
-     */
-    private fun createCheckpointGeofence(tripId: String, checkpoint: Checkpoint): Geofence {
-        return createGeofence(
-            id = "${CHECKPOINT_GEOFENCE_PREFIX}${tripId}_${checkpoint.id}",
-            location = checkpoint.location,
-            radius = checkpoint.radius,
-            transitionTypes = Geofence.GEOFENCE_TRANSITION_ENTER
-        )
-    }
-    
-    /**
-     * Create a geofence
-     */
+
     private fun createGeofence(
         id: String,
         location: LatLng,
         radius: Float,
-        transitionTypes: Int
+        transitionTypes: Int = Geofence.GEOFENCE_TRANSITION_ENTER
     ): Geofence {
         return Geofence.Builder()
             .setRequestId(id)
@@ -102,132 +84,83 @@ class GeofencingManager(private val context: Context) {
                 location.longitude,
                 radius
             )
-            .setExpirationDuration(GEOFENCE_EXPIRATION_DURATION)
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
             .setTransitionTypes(transitionTypes)
-            .setLoiteringDelay(5000) // 5 seconds
+            .setLoiteringDelay(5000)
             .build()
     }
-    
-    /**
-     * Add geofences to the system
-     */
-    @SuppressLint("MissingPermission")
-    private fun addGeofences(geofences: List<Geofence>) {
+
+    private fun addGeofences(geofences: List<Geofence>, tripId: String) {
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.d(TAG, "🔐 CHECKING PERMISSIONS...")
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        val hasFineLocation = ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        Log.d(TAG, "ACCESS_FINE_LOCATION: ${if (hasFineLocation) "✅ GRANTED" else "❌ DENIED"}")
+
+        if (!hasFineLocation) {
+            Log.e(TAG, "❌❌❌ Cannot add geofences - FINE_LOCATION permission not granted!")
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val hasBackgroundLocation = ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            Log.d(TAG, "ACCESS_BACKGROUND_LOCATION: ${if (hasBackgroundLocation) "✅ GRANTED" else "⚠️ NOT GRANTED"}")
+        }
+
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.d(TAG, "✅ Permissions OK! Adding ${geofences.size} geofences...")
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
         val geofencingRequest = GeofencingRequest.Builder().apply {
             setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
             addGeofences(geofences)
         }.build()
-        
+
+        Log.d(TAG, "📤 Sending geofences to Google Play Services...")
+
         geofencingClient.addGeofences(geofencingRequest, getGeofencePendingIntent())
             .addOnSuccessListener {
-                geofences.forEach { activeGeofences.add(it.requestId) }
-                Log.d(TAG, "Successfully added ${geofences.size} geofences")
+                Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                Log.d(TAG, "✅✅✅ GEOFENCES SUCCESSFULLY ADDED!")
+                Log.d(TAG, "   Trip ID: $tripId")
+                Log.d(TAG, "   Count: ${geofences.size}")
+                Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+                geofences.forEachIndexed { index, geofence ->
+                    Log.d(TAG, "   ${index + 1}. ${geofence.requestId}")
+                }
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "Failed to add geofences", e)
+                Log.e(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                Log.e(TAG, "❌❌❌ FAILED TO ADD GEOFENCES!")
+                Log.e(TAG, "   Error: ${e.message}")
+                Log.e(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                e.printStackTrace()
             }
     }
-    
-    /**
-     * Remove geofences for a trip
-     */
-    fun clearTripGeofences(tripId: String) {
-        val geofenceIds = activeGeofences.filter { 
-            it.contains(tripId) 
-        }
-        
-        if (geofenceIds.isNotEmpty()) {
-            geofencingClient.removeGeofences(geofenceIds)
-                .addOnSuccessListener {
-                    activeGeofences.removeAll(geofenceIds.toSet())
-                    Log.d(TAG, "Removed ${geofenceIds.size} geofences for trip $tripId")
-                }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Failed to remove geofences for trip $tripId", e)
-                }
-        }
-    }
-    
-    /**
-     * Remove all geofences
-     */
-    fun clearAllGeofences() {
-        if (activeGeofences.isNotEmpty()) {
-            geofencingClient.removeGeofences(activeGeofences.toList())
-                .addOnSuccessListener {
-                    Log.d(TAG, "Removed all ${activeGeofences.size} geofences")
-                    activeGeofences.clear()
-                }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Failed to remove all geofences", e)
-                }
-        }
-    }
-    
-    /**
-     * Update destination geofences (when user changes destination)
-     */
-    @SuppressLint("MissingPermission")
-    fun updateDestinationGeofences(trip: Trip) {
-        Log.d(TAG, "Updating destination geofences for trip: ${trip.id}")
-        
-        // Remove old destination geofences
-        val oldGeofenceIds = listOf(
-            "${ALARM_GEOFENCE_PREFIX}${trip.id}",
-            "${DESTINATION_GEOFENCE_PREFIX}${trip.id}"
-        )
-        
-        geofencingClient.removeGeofences(oldGeofenceIds)
+
+    fun removeAllGeofences() {
+        geofencingClient.removeGeofences(getGeofencePendingIntent())
             .addOnSuccessListener {
-                activeGeofences.removeAll(oldGeofenceIds.toSet())
-                
-                // Add new destination geofences
-                val newGeofences = listOf(
-                    createGeofence(
-                        id = "${ALARM_GEOFENCE_PREFIX}${trip.id}",
-                        location = trip.currentDestination,
-                        radius = trip.alarmRadius,
-                        transitionTypes = Geofence.GEOFENCE_TRANSITION_ENTER
-                    ),
-                    createGeofence(
-                        id = "${DESTINATION_GEOFENCE_PREFIX}${trip.id}",
-                        location = trip.currentDestination,
-                        radius = trip.notificationRadius,
-                        transitionTypes = Geofence.GEOFENCE_TRANSITION_ENTER
-                    )
-                )
-                
-                addGeofences(newGeofences)
+                Log.d(TAG, "✅ All geofences removed")
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "❌ Failed to remove geofences: ${e.message}")
             }
     }
-    
-    /**
-     * Add a checkpoint geofence
-     */
-    @SuppressLint("MissingPermission")
-    fun addCheckpointGeofence(tripId: String, checkpoint: Checkpoint) {
-        val geofence = createCheckpointGeofence(tripId, checkpoint)
-        addGeofences(listOf(geofence))
-    }
-    
-    /**
-     * Remove a checkpoint geofence
-     */
-    fun removeCheckpointGeofence(tripId: String, checkpointId: String) {
-        val geofenceId = "${CHECKPOINT_GEOFENCE_PREFIX}${tripId}_${checkpointId}"
-        
-        geofencingClient.removeGeofences(listOf(geofenceId))
-            .addOnSuccessListener {
-                activeGeofences.remove(geofenceId)
-                Log.d(TAG, "Removed checkpoint geofence: $geofenceId")
-            }
-    }
-    
-    /**
-     * Get the PendingIntent for geofence transitions
-     */
+
     private fun getGeofencePendingIntent(): PendingIntent {
         val intent = Intent(context, GeofenceBroadcastReceiver::class.java)
+
         return PendingIntent.getBroadcast(
             context,
             0,
@@ -235,14 +168,4 @@ class GeofencingManager(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
     }
-    
-    /**
-     * Get active geofence count
-     */
-    fun getActiveGeofenceCount(): Int = activeGeofences.size
-    
-    /**
-     * Check if a geofence is active
-     */
-    fun isGeofenceActive(geofenceId: String): Boolean = activeGeofences.contains(geofenceId)
 }

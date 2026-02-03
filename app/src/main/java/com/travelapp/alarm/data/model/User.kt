@@ -1,97 +1,66 @@
 package com.travelapp.alarm.data.model
 
-/**
- * Represents a user of the app (traveler)
- */
 data class User(
     val id: String,
     val name: String,
     val phoneNumber: String,
     val email: String? = null,
 
-    // Profile
     val profileImageUrl: String? = null,
     val bio: String? = null,
 
-    // Preferences
     val preferredNotificationMethod: NotificationMethod = NotificationMethod.WHATSAPP,
     val defaultSettings: AppSettings = AppSettings(),
 
-    // Saved data
     val savedContacts: MutableList<Contact> = mutableListOf(),
     val savedLocations: MutableList<PresetLocation> = mutableListOf(),
     val savedPresets: MutableList<ConfigurationPreset> = mutableListOf(),
 
-    // History
-    val tripHistory: MutableList<String> = mutableListOf(), // Trip IDs
+    val tripHistory: MutableList<String> = mutableListOf(),
 
-    // Account info
     val createdAt: Long = System.currentTimeMillis(),
     val lastActive: Long = System.currentTimeMillis(),
     val isPremium: Boolean = false
 ) {
-    /**
-     * Get display name for notifications
-     */
     fun getDisplayName(): String {
         return name
     }
 
-    /**
-     * Get formatted phone number
-     */
     fun getFormattedPhone(): String {
         return phoneNumber
     }
 
-    /**
-     * Add a trip to history
-     */
     fun addTripToHistory(tripId: String) {
         if (!tripHistory.contains(tripId)) {
-            tripHistory.add(0, tripId) // Add to beginning
+            tripHistory.add(0, tripId)
         }
     }
 
-    /**
-     * Get recent trips (last 10)
-     */
     fun getRecentTrips(): List<String> {
         return tripHistory.take(10)
     }
 }
 
-/**
- * Preset location for quick trip setup
- */
 data class PresetLocation(
     val id: String,
     val name: String,
     val address: String,
     val location: LatLng,
 
-    // Default settings for this location
     val defaultAlarmRadius: Float = 500f,
     val defaultNotificationRadius: Float = 200f,
-    val defaultContacts: List<String> = emptyList(), // Contact IDs
+    val defaultContacts: List<String> = emptyList(),
     val icon: String = "📍",
 
-    // Usage
     val usageCount: Int = 0,
     val lastUsed: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 ) {
-    /**
-     * Get display text
-     */
     fun getDisplayText(): String {
         return "$icon $name"
     }
 }
 
-/**
- * Configuration preset for quick settings
- */
 data class ConfigurationPreset(
     val id: String,
     val name: String,
@@ -99,16 +68,13 @@ data class ConfigurationPreset(
     val icon: String,
     val settings: AppSettings,
     val isDefault: Boolean = false,
-    val isBuiltIn: Boolean = false, // Built-in presets can't be deleted
+    val isBuiltIn: Boolean = false,
 
     val createdAt: Long = System.currentTimeMillis(),
     val lastUsed: Long? = null,
     val usageCount: Int = 0
 ) {
     companion object {
-        /**
-         * Built-in presets
-         */
         fun getBuiltInPresets(): List<ConfigurationPreset> {
             return listOf(
                 ConfigurationPreset(
