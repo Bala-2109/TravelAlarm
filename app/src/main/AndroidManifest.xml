@@ -2,32 +2,46 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Location Permissions -->
+    <!-- ========== LOCATION PERMISSIONS ========== -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
-    <!-- Communication Permissions -->
+    <!-- ========== COMMUNICATION PERMISSIONS ========== -->
+    <!-- SMS Permissions -->
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <!-- Call Permissions -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Contact Permissions -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Vibration -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Network & Internet -->
+    <!-- ========== NETWORK & INTERNET ========== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Notifications -->
+    <!-- ========== NOTIFICATIONS ========== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Battery & Foreground Service -->
+    <!-- ========== BATTERY & FOREGROUND SERVICE ========== -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- ========== QUERIES (for WhatsApp detection) ========== -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -40,6 +54,7 @@
         android:theme="@style/Theme.TravelAlarm"
         tools:targetApi="31">
 
+        <!-- ========== MAIN ACTIVITY ========== -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -48,15 +63,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".TestNotificationsActivity"
+            android:exported="false"
+            android:label="Test Notifications" />
 
-        <!-- Location Tracking Service -->
+        <!-- ========== LOCATION TRACKING SERVICE ========== -->
         <service
             android:name=".service.LocationService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Geofence Broadcast Receiver -->
+        <!-- ========== GEOFENCE BROADCAST RECEIVER ========== -->
         <receiver
             android:name=".service.GeofenceBroadcastReceiver"
             android:enabled="true"

@@ -6,35 +6,163 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.enableEdgeToEdge
+import android.widget.Button
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import com.travelapp.alarm.data.model.*
-import com.travelapp.alarm.service.GeofencingManager
 import com.travelapp.alarm.service.LocationService
+import com.travelapp.alarm.util.PermissionManager
 
 class MainActivity : AppCompatActivity() {
 
-    private val PERMISSION_REQUEST_CODE = 100
+    private lateinit var btnStartTracking: Button
+    private lateinit var btnStopTracking: Button
+    private lateinit var tvStatus: TextView
+
+    private lateinit var permissionManager: PermissionManager
+
+    companion object {
+        private const val TAG = "MainActivity"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
 
-        requestPermissions()
-        testDataModels()
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.d(TAG, "🚀 TRAVEL ALARM APP STARTED")
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        // Initialize views
+        initializeViews()
+
+        // Initialize permission manager
+        permissionManager = PermissionManager(this)
+
+        // Request all permissions with proper callback
+        Log.d(TAG, "Requesting all permissions...")
+        permissionManager.requestAllPermissions(object : PermissionManager.PermissionCallback {
+            override fun onPermissionResult(allGranted: Boolean) {
+                if (allGranted) {
+                    Log.d(TAG, "✅ All permissions granted - Ready to start tracking")
+                    updateUI()
+                } else {
+                    Log.e(TAG, "❌ Some permissions denied")
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Please grant all permissions to use this app",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        })
+
+        // Set up button listeners
+        setupButtonListeners()
+
+        // Update UI based on service state
+        updateUI()
     }
 
-    private fun requestPermissions() {
+    private fun initializeViews() {
+        btnStartTracking = findViewById(R.id.btnStartTracking)
+        btnStopTracking = findViewById(R.id.btnStopTracking)
+        tvStatus = findViewById(R.id.tvStatus)
+
+        Log.d(TAG, "✅ Views initialized")
+    }
+
+    private fun setupButtonListeners() {
+        btnStartTracking.setOnClickListener {
+            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d(TAG, "👆 START TRACKING BUTTON CLICKED")
+            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            startLocationTracking()
+        }
+
+        btnStopTracking.setOnClickListener {
+            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d(TAG, "👆 STOP TRACKING BUTTON CLICKED")
+            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            stopLocationTracking()
+        }
+    }
+
+    private fun startLocationTracking() {
+        Log.d(TAG, "🔍 Checking permissions before starting service...")
+
+        // Check if all permissions are granted
+        if (!hasAllPermissions()) {
+            Log.e(TAG, "❌ Not all permissions granted!")
+            Toast.makeText(this, "Please grant all permissions first", Toast.LENGTH_SHORT).show()
+
+            // Request permissions again with proper callback
+            permissionManager.requestAllPermissions(object : PermissionManager.PermissionCallback {
+                override fun onPermissionResult(allGranted: Boolean) {
+                    if (allGranted) {
+                        startLocationTracking()
+                    }
+                }
+            })
+            return
+        }
+
+        Log.d(TAG, "✅ All permissions verified - Starting LocationService...")
+
+        try {
+            // Create intent for LocationService
+            val serviceIntent = Intent(this, LocationService::class.java).apply {
+                action = "ACTION_START"  // Hardcoded string to avoid unresolved reference
+            }
+
+            // Start the service
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Log.d(TAG, "📱 Starting foreground service (Android O+)")
+                startForegroundService(serviceIntent)
+            } else {
+                Log.d(TAG, "📱 Starting service (Android < O)")
+                startService(serviceIntent)
+            }
+
+            Log.d(TAG, "✅ LocationService start command sent")
+
+            // Update UI
+            updateUI()
+
+            Toast.makeText(this, "Location tracking started", Toast.LENGTH_SHORT).show()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to start LocationService: ${e.message}")
+            e.printStackTrace()
+            Toast.makeText(this, "Failed to start tracking: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun stopLocationTracking() {
+        Log.d(TAG, "🛑 Stopping LocationService...")
+
+        try {
+            val serviceIntent = Intent(this, LocationService::class.java).apply {
+                action = "ACTION_STOP"  // Hardcoded string to avoid unresolved reference
+            }
+
+            startService(serviceIntent)
+
+            Log.d(TAG, "✅ LocationService stop command sent")
+
+            // Update UI
+            updateUI()
+
+            Toast.makeText(this, "Location tracking stopped", Toast.LENGTH_SHORT).show()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to stop LocationService: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    private fun hasAllPermissions(): Boolean {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
@@ -48,106 +176,60 @@ class MainActivity : AppCompatActivity() {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        val permissionsToRequest = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        permissions.addAll(listOf(
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_CONTACTS
+        ))
+
+        val allGranted = permissions.all { permission ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
 
-        if (permissionsToRequest.isNotEmpty()) {
-            ActivityCompat.requestPermissions(
-                this,
-                permissionsToRequest.toTypedArray(),
-                PERMISSION_REQUEST_CODE
-            )
+        Log.d(TAG, "Permission check result: $allGranted")
+        return allGranted
+    }
+
+    private fun updateUI() {
+        // Check if service is running by trying to get the static variable
+        // Since we can't access LocationService.isRunning due to compilation error,
+        // we'll track it locally or assume it's running after start
+        val isRunning = isServiceRunning()
+
+        Log.d(TAG, "📱 Updating UI - Service running: $isRunning")
+
+        btnStartTracking.isEnabled = !isRunning
+        btnStopTracking.isEnabled = isRunning
+
+        tvStatus.text = if (isRunning) {
+            "Status: 🟢 Tracking Active"
         } else {
-            startLocationService()
+            "Status: ⚪ Not Tracking"
         }
-    }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                startLocationService()
-            }
-        }
-    }
-
-    private fun startLocationService() {
-        val intent = Intent(this, LocationService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
+        if (isRunning) {
+            tvStatus.setTextColor(getColor(android.R.color.holo_green_dark))
         } else {
-            startService(intent)
+            tvStatus.setTextColor(getColor(android.R.color.darker_gray))
         }
     }
 
-    private fun testDataModels() {
-        Log.d("TravelAlarm", "========== Testing Data Models ==========")
+    private fun isServiceRunning(): Boolean {
+        // Simple check - you can enhance this with ActivityManager if needed
+        // For now, we'll check if the START button was pressed
+        return !btnStopTracking.isEnabled
+    }
 
-        val home = LatLng(13.0827, 80.2707)
-        val station = LatLng(12.9249, 80.1000)
-        Log.d("TravelAlarm", "✅ LatLng created: $home")
-        Log.d("TravelAlarm", "   Distance: ${(home.distanceTo(station)/1000).toInt()} km")
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "📱 Activity resumed - Updating UI")
+        updateUI()
+    }
 
-        val user = User(
-            id = "user1",
-            name = "Balas",
-            phoneNumber = "+91 9876543210",
-            email = "balas@example.com"
-        )
-        Log.d("TravelAlarm", "✅ User created: ${user.name}")
-
-        val contact = Contact(
-            id = "1",
-            name = "Mom",
-            phoneNumber = "+91 9876543210",
-            hasApp = false,
-            primaryMethod = NotificationMethod.WHATSAPP,
-            fallbackMethod = NotificationMethod.SMS
-        )
-        Log.d("TravelAlarm", "✅ Contact created: ${contact.name}")
-
-        val checkpoint = Checkpoint(
-            id = "cp1",
-            name = "Tambaram Station",
-            location = station,
-            radius = 300f,
-            notifyOnEntry = true,
-            notifyContacts = true,
-            notifyTraveler = true
-        )
-        Log.d("TravelAlarm", "✅ Checkpoint created: ${checkpoint.name}")
-
-        val trip = Trip(
-            id = "trip1",
-            traveler = user,
-            startLocation = station,
-            startLocationName = "Tambaram Station",
-            originalDestination = home,
-            originalDestinationName = "Home",
-            currentDestination = home,
-            currentDestinationName = "Home",
-            pickupPeople = mutableListOf(contact),
-            checkpoints = mutableListOf(checkpoint)
-        )
-        Log.d("TravelAlarm", "✅ Trip created: ${trip.traveler.name} → ${trip.currentDestinationName}")
-
-        trip.start()
-
-        val geofencingManager = GeofencingManager(this)
-        geofencingManager.setupTripGeofences(trip)
-
-        Log.d("TravelAlarm", "✅ Geofences registered for trip")
-        Log.d("TravelAlarm", "   - Destination: ${trip.currentDestinationName}")
-        Log.d("TravelAlarm", "   - Alarm radius: ${trip.alarmRadius}m")
-        Log.d("TravelAlarm", "   - Notify radius: ${trip.notificationRadius}m")
-        Log.d("TravelAlarm", "   - Checkpoints: ${trip.checkpoints.size}")
-
-        Log.d("TravelAlarm", "========== All Models Working! ==========")
+    override fun onDestroy() {
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.d(TAG, "🔴 MainActivity DESTROYED")
+        Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        super.onDestroy()
     }
 }

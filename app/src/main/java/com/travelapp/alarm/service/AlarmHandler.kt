@@ -20,7 +20,7 @@ object AlarmHandler {
     private const val NOTIFICATION_ID_ALARM = 2001
     private const val NOTIFICATION_ID_CHECKPOINT = 2002
 
-    fun triggerDestinationAlarm(context: Context, geofenceId: String) {
+    fun triggerDestinationAlarm(context: Context, @Suppress("UNUSED_PARAMETER") geofenceId: String) {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.d(TAG, "🔔 DESTINATION ALARM TRIGGERED!")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -37,7 +37,7 @@ object AlarmHandler {
         playAlarmSound(context)
     }
 
-    fun triggerDestinationNotification(context: Context, geofenceId: String) {
+    fun triggerDestinationNotification(context: Context, @Suppress("UNUSED_PARAMETER") geofenceId: String) {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.d(TAG, "📍 DESTINATION NOTIFICATION TRIGGERED!")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
