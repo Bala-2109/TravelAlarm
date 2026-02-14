@@ -155,6 +155,7 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
 
             val sampleTrip = Trip(
                 id = "trip1",
+                name = "My Trip",
                 traveler = sampleUser,
                 startLocation = LatLng(12.9249, 80.1000),
                 startLocationName = "Tambaram",

@@ -50,6 +50,7 @@ data class LocationChange(
 
 data class Trip(
     val id: String,
+    val name: String,
     val traveler: User,
 
     val startLocation: LatLng,
