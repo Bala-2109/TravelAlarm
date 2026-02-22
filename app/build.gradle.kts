@@ -37,14 +37,13 @@ android {
         jvmTarget = "1.8"
     }
 
-    // Remove or fix buildFeatures - this is causing the error
     buildFeatures {
-        // Only enable viewBinding, NOT dataBinding
-        viewBinding = false  // Change to false to disable completely
+        viewBinding = true
     }
 }
 
 dependencies {
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

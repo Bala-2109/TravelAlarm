@@ -279,9 +279,9 @@ class CreateTripActivity : AppCompatActivity() {
     }
 
     private fun saveTrip() {
-        val tripName = etTripName.text.toString().trim()
+        val name = etTripName.text.toString().trim()
 
-        if (tripName.isBlank()) {
+        if (name.isBlank()) {
             Toast.makeText(this, "Please enter trip name", Toast.LENGTH_SHORT).show()
             return
         }
@@ -294,7 +294,7 @@ class CreateTripActivity : AppCompatActivity() {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.d(TAG, "💾 SAVING TRIP")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        Log.d(TAG, "Trip Name: $tripName")
+        Log.d(TAG, "Trip Name: $name")
         Log.d(TAG, "Destination: ${destinationLatLng!!.latitude}, ${destinationLatLng!!.longitude}")
         Log.d(TAG, "Checkpoints: ${checkpoints.size}")
 
@@ -310,7 +310,7 @@ class CreateTripActivity : AppCompatActivity() {
         // Create trip matching YOUR exact Trip model
         val trip = Trip(
             id = UUID.randomUUID().toString(),
-            name = tripName,
+            name = name,
             traveler = user,
             startLocation = currentLocation,
             startLocationName = "Start",

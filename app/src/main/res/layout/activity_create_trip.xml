@@ -7,8 +7,7 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:context=".CreateTripActivity">
+        android:layout_height="match_parent">
 
         <!-- Trip Name Input -->
         <com.google.android.material.textfield.TextInputLayout
@@ -30,7 +29,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- OpenStreetMap MapView -->
+        <!-- THIS IS THE MAP - MUST BE PRESENT -->
         <org.osmdroid.views.MapView
             android:id="@+id/mapView"
             android:layout_width="0dp"
@@ -41,7 +40,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tilTripName" />
 
-        <!-- Buttons Layout -->
+        <!-- Buttons at bottom -->
         <LinearLayout
             android:id="@+id/llButtons"
             android:layout_width="0dp"
@@ -53,7 +52,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent">
 
-            <!-- Set Destination Button -->
             <Button
                 android:id="@+id/btnSetDestination"
                 android:layout_width="match_parent"
@@ -64,7 +62,6 @@
                 android:textColor="@android:color/white"
                 android:textStyle="bold" />
 
-            <!-- Add Checkpoint Button -->
             <Button
                 android:id="@+id/btnAddCheckpoint"
                 android:layout_width="match_parent"
@@ -76,14 +73,12 @@
                 android:textColor="@android:color/white"
                 android:textStyle="bold" />
 
-            <!-- Buttons Row: Save and Cancel -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
-                <!-- Cancel Button -->
                 <Button
                     android:id="@+id/btnCancel"
                     android:layout_width="0dp"
@@ -94,7 +89,6 @@
                     android:text="CANCEL"
                     android:textColor="@android:color/white" />
 
-                <!-- Save Trip Button -->
                 <Button
                     android:id="@+id/btnSaveTrip"
                     android:layout_width="0dp"
@@ -108,17 +102,6 @@
                     android:textStyle="bold" />
 
             </LinearLayout>
-
-            <!-- Instructions -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@android:drawable/dialog_holo_light_frame"
-                android:padding="8dp"
-                android:text="1. Enter trip name\n2. Tap 'Set Destination' then tap on map\n3. Tap 'Add Checkpoint' to add stops\n4. Tap checkpoints to remove them\n\nUsing OpenStreetMap (100% Free!)"
-                android:textColor="@android:color/darker_gray"
-                android:textSize="11sp" />
 
         </LinearLayout>
 
