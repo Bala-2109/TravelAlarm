@@ -11,10 +11,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.travelapp.alarm.data.model.Checkpoint
-import com.travelapp.alarm.data.model.LatLng
 import com.travelapp.alarm.data.model.Trip
-import com.travelapp.alarm.data.model.User
 import com.travelapp.alarm.manager.TripManager
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -43,8 +40,8 @@ class CreateTripActivity : AppCompatActivity() {
     private var isSettingDestination = false
     private var isAddingCheckpoint = false
 
-    private var destinationLatLng: LatLng? = null
-    private val checkpoints = mutableListOf<Checkpoint>()
+    private var destinationGeoPoint: GeoPoint? = null
+    private val checkpoints = mutableListOf<Trip.Checkpoint>()
 
     companion object {
         private const val TAG = "CreateTripActivity"
@@ -133,7 +130,7 @@ class CreateTripActivity : AppCompatActivity() {
         }
 
         btnAddCheckpoint.setOnClickListener {
-            if (destinationLatLng == null) {
+            if (destinationGeoPoint == null) {
                 Toast.makeText(this, "Please set destination first", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -183,10 +180,7 @@ class CreateTripActivity : AppCompatActivity() {
         mapView.overlays.add(destinationMarker)
         mapView.invalidate()
 
-        destinationLatLng = LatLng(
-            latitude = geoPoint.latitude,
-            longitude = geoPoint.longitude
-        )
+        destinationGeoPoint = geoPoint
 
         Log.d(TAG, "✅ Destination set at: ${geoPoint.latitude}, ${geoPoint.longitude}")
         Toast.makeText(this, "Destination set!", Toast.LENGTH_SHORT).show()
@@ -215,14 +209,12 @@ class CreateTripActivity : AppCompatActivity() {
         checkpointMarkers.add(marker)
         mapView.invalidate()
 
-        // Create checkpoint - match YOUR Checkpoint model exactly
-        val checkpoint = Checkpoint(
-            id = UUID.randomUUID().toString(),
+        val checkpoint = Trip.Checkpoint(
             name = "Checkpoint ${checkpoints.size + 1}",
-            location = LatLng(
-                latitude = geoPoint.latitude,
-                longitude = geoPoint.longitude
-            )
+            latitude = geoPoint.latitude,
+            longitude = geoPoint.longitude,
+            isReached = false,
+            checkpointName = "Checkpoint ${checkpoints.size + 1}"
         )
         checkpoints.add(checkpoint)
 
@@ -249,19 +241,16 @@ class CreateTripActivity : AppCompatActivity() {
     }
 
     private fun renumberCheckpoints() {
-        // Update marker titles
         checkpointMarkers.forEachIndexed { index, marker ->
             marker.title = "Checkpoint ${index + 1}"
         }
 
-        // Recreate checkpoints with new names
-        val updatedCheckpoints = mutableListOf<Checkpoint>()
+        val updatedCheckpoints = mutableListOf<Trip.Checkpoint>()
         checkpoints.forEachIndexed { index, checkpoint ->
             updatedCheckpoints.add(
-                Checkpoint(
-                    id = checkpoint.id,
+                checkpoint.copy(
                     name = "Checkpoint ${index + 1}",
-                    location = checkpoint.location
+                    checkpointName = "Checkpoint ${index + 1}"
                 )
             )
         }
@@ -273,7 +262,7 @@ class CreateTripActivity : AppCompatActivity() {
 
     private fun updateSaveButtonState() {
         val hasName = etTripName.text.toString().isNotBlank()
-        val hasDestination = destinationLatLng != null
+        val hasDestination = destinationGeoPoint != null
 
         btnSaveTrip.isEnabled = hasName && hasDestination
     }
@@ -286,7 +275,7 @@ class CreateTripActivity : AppCompatActivity() {
             return
         }
 
-        if (destinationLatLng == null) {
+        if (destinationGeoPoint == null) {
             Toast.makeText(this, "Please set destination", Toast.LENGTH_SHORT).show()
             return
         }
@@ -295,42 +284,28 @@ class CreateTripActivity : AppCompatActivity() {
         Log.d(TAG, "💾 SAVING TRIP")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.d(TAG, "Trip Name: $name")
-        Log.d(TAG, "Destination: ${destinationLatLng!!.latitude}, ${destinationLatLng!!.longitude}")
+        Log.d(TAG, "Destination: ${destinationGeoPoint!!.latitude}, ${destinationGeoPoint!!.longitude}")
         Log.d(TAG, "Checkpoints: ${checkpoints.size}")
 
-        // Get current location or use default
-        val currentLocation = LatLng(
-            latitude = DEFAULT_LOCATION.latitude,
-            longitude = DEFAULT_LOCATION.longitude
-        )
+        val startLocationGeoPoint = myLocationOverlay.myLocation ?: DEFAULT_LOCATION
 
-        // Create a default user for now
-        val user = User(id = "1", name = "Test User", phoneNumber = "1234567890")
-
-        // Create trip matching YOUR exact Trip model
         val trip = Trip(
             id = UUID.randomUUID().toString(),
-            name = name,
-            traveler = user,
-            startLocation = currentLocation,
-            startLocationName = "Start",
-            originalDestination = destinationLatLng!!,
-            originalDestinationName = "Destination",
-            currentDestination = destinationLatLng!!,
+            tripName = name,
+            startLocation = "${startLocationGeoPoint.latitude},${startLocationGeoPoint.longitude}",
+            destination = "${destinationGeoPoint!!.latitude},${destinationGeoPoint!!.longitude}",
             currentDestinationName = "Destination",
-            checkpoints = checkpoints.toMutableList()
+            latitude = destinationGeoPoint!!.latitude,
+            longitude = destinationGeoPoint!!.longitude,
+            checkpoints = checkpoints,
+            enabled = true
         )
 
-        val success = tripManager.saveTrip(trip)
+        tripManager.saveTrip(trip)
 
-        if (success) {
-            Log.d(TAG, "✅ Trip saved successfully!")
-            Toast.makeText(this, "Trip created successfully!", Toast.LENGTH_SHORT).show()
-            finish()
-        } else {
-            Log.e(TAG, "❌ Failed to save trip")
-            Toast.makeText(this, "Failed to save trip", Toast.LENGTH_SHORT).show()
-        }
+        Log.d(TAG, "✅ Trip saved successfully!")
+        Toast.makeText(this, "Trip created successfully!", Toast.LENGTH_SHORT).show()
+        finish()
     }
 
     private fun hasLocationPermission(): Boolean {

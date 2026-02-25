@@ -229,7 +229,7 @@ class MainActivity : AppCompatActivity() {
 
         val tripInfoText = when {
             activeTrip != null -> """
-                Active Trip: ${activeTrip.name}
+                Active Trip: ${activeTrip.tripName}
                 Checkpoints: ${activeTrip.checkpoints.size}
                 Total Trips: ${trips.size}
             """.trimIndent()

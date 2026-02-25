@@ -8,7 +8,7 @@ import com.google.gson.reflect.TypeToken
 import com.travelapp.alarm.data.model.Contact
 import com.travelapp.alarm.data.model.Trip
 
-class TripManager(context: Context) {
+class TripManager private constructor(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
@@ -30,75 +30,51 @@ class TripManager(context: Context) {
         }
     }
 
-    // ==================== TRIP MANAGEMENT ====================
+    /**
+     * Save a trip
+     */
+    fun saveTrip(trip: Trip): Boolean {
+        return try {
+            val trips = getAllTrips().toMutableList()
 
+            // Check if trip already exists
+            val existingIndex = trips.indexOfFirst { it.id == trip.id }
+            if (existingIndex != -1) {
+                trips[existingIndex] = trip
+                Log.d(TAG, "Updated existing trip: ${trip.tripName}")
+            } else {
+                trips.add(trip)
+                Log.d(TAG, "Added new trip: ${trip.tripName}")
+            }
+
+            val json = gson.toJson(trips)
+            prefs.edit().putString(KEY_TRIPS, json).apply()
+
+            Log.d(TAG, "✅ Trip saved successfully")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error saving trip: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Get all trips
+     */
     fun getAllTrips(): List<Trip> {
         return try {
             val json = prefs.getString(KEY_TRIPS, null) ?: return emptyList()
             val type = object : TypeToken<List<Trip>>() {}.type
             gson.fromJson(json, type) ?: emptyList()
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading trips: ${e.message}")
-            e.printStackTrace()
+            Log.e(TAG, "❌ Error loading trips: ${e.message}")
             emptyList()
         }
     }
 
-    fun saveTrip(trip: Trip): Boolean {
-        return try {
-            val trips = getAllTrips().toMutableList()
-
-            // Remove existing trip with same ID
-            trips.removeAll { it.id == trip.id }
-
-            // Add new/updated trip
-            trips.add(trip)
-
-            // Save to preferences
-            val json = gson.toJson(trips)
-            val success = prefs.edit().putString(KEY_TRIPS, json).commit()
-
-            if (success) {
-                Log.d(TAG, "✅ Trip saved: ${trip.name}")
-            } else {
-                Log.e(TAG, "❌ Failed to commit trip to SharedPreferences")
-            }
-
-            success
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error saving trip: ${e.message}")
-            e.printStackTrace()
-            false
-        }
-    }
-
-    fun deleteTrip(tripId: String): Boolean {
-        return try {
-            val trips = getAllTrips().toMutableList()
-            val removed = trips.removeAll { it.id == tripId }
-
-            if (removed) {
-                val json = gson.toJson(trips)
-                prefs.edit().putString(KEY_TRIPS, json).apply()
-
-                // If this was the active trip, clear it
-                if (getActiveTripId() == tripId) {
-                    clearActiveTrip()
-                }
-
-                Log.d(TAG, "✅ Trip deleted: $tripId")
-                true
-            } else {
-                Log.w(TAG, "⚠️ Trip not found for deletion: $tripId")
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error deleting trip: ${e.message}")
-            e.printStackTrace()
-            false
-        }
-    }
-
+    /**
+     * Get trip by ID
+     */
     fun getTripById(tripId: String): Trip? {
         return try {
             getAllTrips().find { it.id == tripId }
@@ -108,182 +84,154 @@ class TripManager(context: Context) {
         }
     }
 
+    /**
+     * Delete a trip
+     */
+    fun deleteTrip(tripId: String): Boolean {
+        return try {
+            val trips = getAllTrips().toMutableList()
+            val removed = trips.removeIf { it.id == tripId }
+
+            if (removed) {
+                val json = gson.toJson(trips)
+                prefs.edit().putString(KEY_TRIPS, json).apply()
+
+                // Clear active trip if this was it
+                if (getActiveTripId() == tripId) {
+                    clearActiveTrip()
+                }
+
+                Log.d(TAG, "✅ Trip deleted successfully")
+            }
+
+            removed
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error deleting trip: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Set active trip
+     */
     fun setActiveTrip(tripId: String): Boolean {
         return try {
-            val trip = getTripById(tripId)
-            if (trip != null) {
-                prefs.edit().putString(KEY_ACTIVE_TRIP_ID, tripId).apply()
-                Log.d(TAG, "✅ Active trip set: ${trip.name}")
-                true
-            } else {
-                Log.e(TAG, "❌ Trip not found: $tripId")
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error setting active trip: ${e.message}")
-            e.printStackTrace()
-            false
-        }
-    }
-
-    fun getActiveTrip(): Trip? {
-        return try {
-            val tripId = getActiveTripId() ?: return null
-            getTripById(tripId)
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error getting active trip: ${e.message}")
-            null
-        }
-    }
-
-    fun getActiveTripId(): String? {
-        return try {
-            prefs.getString(KEY_ACTIVE_TRIP_ID, null)
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error getting active trip ID: ${e.message}")
-            null
-        }
-    }
-
-    fun clearActiveTrip() {
-        try {
-            prefs.edit().remove(KEY_ACTIVE_TRIP_ID).apply()
-            Log.d(TAG, "✅ Active trip cleared")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error clearing active trip: ${e.message}")
-        }
-    }
-
-    fun completeTrip(tripId: String): Boolean {
-        return try {
-            val trip = getTripById(tripId) ?: return false
-            clearActiveTrip()
-            Log.d(TAG, "✅ Trip completed: ${trip.name}")
+            prefs.edit().putString(KEY_ACTIVE_TRIP_ID, tripId).apply()
+            Log.d(TAG, "✅ Active trip set: $tripId")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error completing trip: ${e.message}")
+            Log.e(TAG, "❌ Error setting active trip: ${e.message}")
             false
         }
     }
 
-    fun startTrip(tripId: String): Boolean {
+    /**
+     * Get active trip ID
+     */
+    fun getActiveTripId(): String? {
+        return prefs.getString(KEY_ACTIVE_TRIP_ID, null)
+    }
+
+    /**
+     * Get active trip
+     */
+    fun getActiveTrip(): Trip? {
+        val activeTripId = getActiveTripId() ?: return null
+        return getTripById(activeTripId)
+    }
+
+    /**
+     * Clear active trip
+     */
+    fun clearActiveTrip() {
+        prefs.edit().remove(KEY_ACTIVE_TRIP_ID).apply()
+        Log.d(TAG, "✅ Active trip cleared")
+    }
+
+    /**
+     * Complete a trip
+     */
+    fun completeTrip(tripId: String): Boolean {
+        clearActiveTrip()
+        Log.d(TAG, "✅ Trip completed: $tripId")
+        return true
+    }
+
+    /**
+     * Save a contact
+     */
+    fun saveContact(contact: Contact): Boolean {
         return try {
-            setActiveTrip(tripId)
+            val contacts = getAllContacts().toMutableList()
+
+            val existingIndex = contacts.indexOfFirst { it.id == contact.id }
+            if (existingIndex != -1) {
+                contacts[existingIndex] = contact
+            } else {
+                contacts.add(contact)
+            }
+
+            val json = gson.toJson(contacts)
+            prefs.edit().putString(KEY_CONTACTS, json).apply()
+
+            Log.d(TAG, "✅ Contact saved: ${contact.name}")
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error starting trip: ${e.message}")
+            Log.e(TAG, "❌ Error saving contact: ${e.message}")
             false
         }
     }
 
-    // ==================== CONTACT MANAGEMENT ====================
-
+    /**
+     * Get all contacts
+     */
     fun getAllContacts(): List<Contact> {
         return try {
             val json = prefs.getString(KEY_CONTACTS, null) ?: return emptyList()
             val type = object : TypeToken<List<Contact>>() {}.type
             gson.fromJson(json, type) ?: emptyList()
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading contacts: ${e.message}")
-            e.printStackTrace()
+            Log.e(TAG, "❌ Error loading contacts: ${e.message}")
             emptyList()
         }
     }
 
-    fun saveContact(contact: Contact): Boolean {
-        return try {
-            val contacts = getAllContacts().toMutableList()
-
-            // Remove existing contact with same ID
-            contacts.removeAll { it.id == contact.id }
-
-            // Add new/updated contact
-            contacts.add(contact)
-
-            // Save to preferences
-            val json = gson.toJson(contacts)
-            val success = prefs.edit().putString(KEY_CONTACTS, json).commit()
-
-            if (success) {
-                Log.d(TAG, "✅ Contact saved: ${contact.name}")
-            } else {
-                Log.e(TAG, "❌ Failed to commit contact to SharedPreferences")
-            }
-
-            success
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error saving contact: ${e.message}")
-            e.printStackTrace()
-            false
-        }
-    }
-
+    /**
+     * Delete a contact
+     */
     fun deleteContact(contactId: String): Boolean {
         return try {
             val contacts = getAllContacts().toMutableList()
-            val removed = contacts.removeAll { it.id == contactId }
+            val removed = contacts.removeIf { it.id == contactId }
 
             if (removed) {
                 val json = gson.toJson(contacts)
                 prefs.edit().putString(KEY_CONTACTS, json).apply()
-                Log.d(TAG, "✅ Contact deleted: $contactId")
-                true
-            } else {
-                Log.w(TAG, "⚠️ Contact not found for deletion: $contactId")
-                false
+                Log.d(TAG, "✅ Contact deleted")
             }
+
+            removed
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error deleting contact: ${e.message}")
-            e.printStackTrace()
             false
         }
     }
 
-    fun getContactById(contactId: String): Contact? {
-        return try {
-            getAllContacts().find { it.id == contactId }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error getting contact by ID: ${e.message}")
-            null
-        }
-    }
-
-    fun getContactsForTrip(trip: Trip): List<Contact> {
-        return try {
-            getAllContacts()
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error getting contacts for trip: ${e.message}")
-            emptyList()
-        }
-    }
-
-    // ==================== UTILITY METHODS ====================
-
-    fun clearAllData() {
-        try {
-            prefs.edit()
-                .remove(KEY_TRIPS)
-                .remove(KEY_CONTACTS)
-                .remove(KEY_ACTIVE_TRIP_ID)
-                .apply()
-            Log.d(TAG, "✅ All data cleared")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error clearing data: ${e.message}")
-        }
-    }
-
+    /**
+     * Export all data
+     */
     fun exportData(): String {
-        return try {
-            val data = mapOf(
-                "trips" to getAllTrips(),
-                "contacts" to getAllContacts()
-            )
-            gson.toJson(data)
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error exporting data: ${e.message}")
-            "{}"
-        }
+        val data = mapOf(
+            "trips" to getAllTrips(),
+            "contacts" to getAllContacts(),
+            "activeTrip" to getActiveTripId()
+        )
+        return gson.toJson(data)
     }
 
+    /**
+     * Import data
+     */
     fun importData(json: String): Boolean {
         return try {
             val type = object : TypeToken<Map<String, Any>>() {}.type
@@ -301,29 +249,18 @@ class TripManager(context: Context) {
             true
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error importing data: ${e.message}")
-            e.printStackTrace()
             false
         }
     }
 
-    fun getStatistics(): Map<String, Any> {
-        return try {
-            val trips = getAllTrips()
-
-            mapOf(
-                "totalTrips" to trips.size,
-                "totalContacts" to getAllContacts().size,
-                "totalCheckpoints" to trips.sumOf { it.checkpoints.size },
-                "activeTrip" to (getActiveTrip() != null)
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error getting statistics: ${e.message}")
-            mapOf(
-                "totalTrips" to 0,
-                "totalContacts" to 0,
-                "totalCheckpoints" to 0,
-                "activeTrip" to false
-            )
-        }
+    /**
+     * Get statistics
+     */
+    fun getStatistics(): Map<String, Int> {
+        return mapOf(
+            "totalTrips" to getAllTrips().size,
+            "totalContacts" to getAllContacts().size,
+            "hasActiveTrip" to if (getActiveTrip() != null) 1 else 0
+        )
     }
 }

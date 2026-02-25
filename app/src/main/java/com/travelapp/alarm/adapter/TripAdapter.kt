@@ -16,9 +16,10 @@ class TripAdapter(
 ) : RecyclerView.Adapter<TripAdapter.TripViewHolder>() {
 
     private var trips = emptyList<Trip>()
+    private var activeTripId: String? = null
 
     class TripViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val tvName: TextView = itemView.findViewById(R.id.tvName)
+        val tvTripName: TextView = itemView.findViewById(R.id.tvTripName)
         val tvDestination: TextView = itemView.findViewById(R.id.tvDestination)
         val tvCheckpointCount: TextView = itemView.findViewById(R.id.tvCheckpointCount)
         val tvActiveIndicator: TextView = itemView.findViewById(R.id.tvActiveIndicator)
@@ -35,12 +36,12 @@ class TripAdapter(
     override fun onBindViewHolder(holder: TripViewHolder, position: Int) {
         val trip = trips[position]
 
-        holder.tvName.text = trip.name
+        holder.tvTripName.text = trip.tripName
         holder.tvDestination.text = "📍 ${trip.originalDestinationName}"
         holder.tvCheckpointCount.text = "${trip.checkpoints.size} checkpoints"
 
         // Show/hide active indicator
-        if (trip.id == getCurrentActiveTripId()) {
+        if (trip.id == activeTripId) {
             holder.tvActiveIndicator.visibility = View.VISIBLE
             holder.btnStart.text = "ACTIVE"
             holder.btnStart.isEnabled = false
@@ -71,13 +72,8 @@ class TripAdapter(
         notifyDataSetChanged()
     }
 
-    // This should be set from TripListActivity
-    private var activeTripId: String? = null
-
     fun setActiveTripId(id: String?) {
         activeTripId = id
         notifyDataSetChanged()
     }
-
-    private fun getCurrentActiveTripId(): String? = activeTripId
 }

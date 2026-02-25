@@ -6,201 +6,109 @@ import android.content.Intent
 import android.util.Log
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
-import com.travelapp.alarm.data.model.*
+import com.travelapp.alarm.AlarmActivity
+import com.travelapp.alarm.manager.TripManager
 
-/**
- * Receives geofence transition events and triggers appropriate notifications
- */
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
 
-    private val TAG = "GeofenceReceiver"
+    companion object {
+        private const val TAG = "GeofenceBroadcastReceiver"
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        Log.d(TAG, "📩 BROADCAST RECEIVED!")
+        Log.d(TAG, "📡 GEOFENCE EVENT RECEIVED")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
         val geofencingEvent = GeofencingEvent.fromIntent(intent)
 
         if (geofencingEvent == null) {
-            Log.e(TAG, "❌ GeofencingEvent is NULL!")
+            Log.e(TAG, "❌ Geofencing event is null")
             return
         }
 
         if (geofencingEvent.hasError()) {
-            Log.e(TAG, "❌ GEOFENCING ERROR: ${geofencingEvent.errorCode}")
+            Log.e(TAG, "❌ Geofencing error: ${geofencingEvent.errorCode}")
             return
         }
 
+        // Get the transition type
         val geofenceTransition = geofencingEvent.geofenceTransition
-        val triggeringGeofences = geofencingEvent.triggeringGeofences
 
-        if (triggeringGeofences == null || triggeringGeofences.isEmpty()) {
-            Log.e(TAG, "❌ No triggering geofences")
-            return
-        }
+        if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
+            Log.d(TAG, "✅ GEOFENCE ENTERED")
 
-        when (geofenceTransition) {
-            Geofence.GEOFENCE_TRANSITION_ENTER -> {
-                triggeringGeofences.forEach { geofence ->
+            // Get triggering geofences
+            val triggeringGeofences = geofencingEvent.triggeringGeofences
+
+            if (triggeringGeofences != null && triggeringGeofences.isNotEmpty()) {
+                for (geofence in triggeringGeofences) {
                     handleGeofenceEnter(context, geofence.requestId)
                 }
-            }
-            Geofence.GEOFENCE_TRANSITION_EXIT -> {
-                Log.d(TAG, "🚶 Geofence exit detected")
-            }
-            else -> {
-                Log.w(TAG, "⚠️ Unknown geofence transition: $geofenceTransition")
             }
         }
     }
 
     private fun handleGeofenceEnter(context: Context, geofenceId: String) {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        Log.d(TAG, "🎯 GEOFENCE ENTERED: $geofenceId")
+        Log.d(TAG, "🚨 GEOFENCE ENTERED: $geofenceId")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        when {
-            // Destination alarm zone
-            geofenceId.contains(GeofencingManager.GEOFENCE_DESTINATION_ALARM) -> {
-                Log.d(TAG, "🔔 DESTINATION ALARM ZONE REACHED!")
+        // Parse geofence ID to determine type
+        val isDestination = geofenceId.endsWith("_destination")
+        val tripId = geofenceId.substringBefore("_checkpoint").substringBefore("_destination")
 
-                // Trigger alarm
-                AlarmHandler.triggerDestinationAlarm(context, geofenceId)
+        // Get trip details
+        val tripManager = TripManager.getInstance(context)
+        val trip = tripManager.getTripById(tripId)
 
-                // Send notifications to contacts
-                sendContactNotifications(
-                    context,
-                    eventType = "DESTINATION_REACHED",
-                    message = "🎯 Traveler has arrived at destination!"
-                )
-            }
+        if (trip == null) {
+            Log.e(TAG, "❌ Trip not found for ID: $tripId")
+            return
+        }
 
-            // Destination notification zone
-            geofenceId.contains(GeofencingManager.GEOFENCE_DESTINATION_NOTIFY) -> {
-                Log.d(TAG, "📍 DESTINATION NOTIFICATION ZONE REACHED!")
-
-                // Trigger notification
-                AlarmHandler.triggerDestinationNotification(context, geofenceId)
-
-                // Send notifications to contacts
-                sendContactNotifications(
-                    context,
-                    eventType = "DESTINATION_NEARBY",
-                    message = "📍 Traveler is approaching destination!"
-                )
-            }
-
-            // Checkpoint
-            geofenceId.startsWith(GeofencingManager.GEOFENCE_CHECKPOINT_PREFIX) -> {
-                val checkpointId = geofenceId.removePrefix(GeofencingManager.GEOFENCE_CHECKPOINT_PREFIX)
-                Log.d(TAG, "✅ CHECKPOINT REACHED: $checkpointId")
-
-                // Trigger checkpoint alarm
-                AlarmHandler.triggerCheckpointAlarm(context, checkpointId)
-
-                // Send notifications to contacts
-                sendContactNotifications(
-                    context,
-                    eventType = "CHECKPOINT_REACHED",
-                    message = "✅ Traveler passed checkpoint: $checkpointId"
-                )
-            }
-
-            else -> {
-                Log.w(TAG, "⚠️ Unknown geofence type: $geofenceId")
+        // Determine checkpoint name
+        val checkpointName = if (isDestination) {
+            trip.currentDestinationName
+        } else {
+            val checkpointIndex = geofenceId.substringAfterLast("_").toIntOrNull() ?: 0
+            if (checkpointIndex < trip.checkpoints.size) {
+                trip.checkpoints[checkpointIndex].name
+            } else {
+                "Unknown Checkpoint"
             }
         }
+
+        Log.d(TAG, "📍 Location: $checkpointName")
+        Log.d(TAG, "🗺️ Trip: ${trip.tripName}")
+        Log.d(TAG, "🎯 Type: ${if (isDestination) "DESTINATION" else "CHECKPOINT"}")
+
+        // Launch alarm activity
+        launchAlarmActivity(context, trip.tripName, checkpointName, isDestination)
     }
 
-    /**
-     * Send notifications to all contacts
-     * In a real app, this would fetch the actual trip and contacts from database
-     * For now, we'll create a sample notification
-     */
-    private fun sendContactNotifications(
+    private fun launchAlarmActivity(
         context: Context,
-        eventType: String,
-        message: String
+        tripName: String,
+        locationName: String,
+        isDestination: Boolean
     ) {
-        Log.d(TAG, "")
-        Log.d(TAG, "╔════════════════════════════════════════╗")
-        Log.d(TAG, "║   📢 SENDING CONTACT NOTIFICATIONS     ║")
-        Log.d(TAG, "╚════════════════════════════════════════╝")
-        Log.d(TAG, "Event: $eventType")
-        Log.d(TAG, "Message: $message")
-        Log.d(TAG, "")
+        Log.d(TAG, "🚨 Launching alarm activity...")
+
+        val intent = Intent(context, AlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_NO_USER_ACTION
+            putExtra("TRIP_NAME", tripName)
+            putExtra("LOCATION_NAME", locationName)
+            putExtra("IS_DESTINATION", isDestination)
+        }
 
         try {
-            // Create notification manager
-            val notificationManager = NotificationManager(context)
-
-            // In a real app, fetch the current trip and contacts from database/repository
-            // For now, create sample data to demonstrate the notification system
-
-            val sampleUser = User(
-                id = "user1",
-                name = "Balas",
-                phoneNumber = "+91 9876543210"
-            )
-
-            val sampleContact = Contact(
-                id = "contact1",
-                name = "Mom",
-                phoneNumber = "+91 9876543210", // Replace with real phone number for testing
-                primaryMethod = NotificationMethod.WHATSAPP,
-                fallbackMethod = NotificationMethod.SMS,
-                autoFallback = true
-            )
-
-            val sampleTrip = Trip(
-                id = "trip1",
-                name = "My Trip",
-                traveler = sampleUser,
-                startLocation = LatLng(12.9249, 80.1000),
-                startLocationName = "Tambaram",
-                originalDestination = LatLng(13.0827, 80.2707),
-                originalDestinationName = "Home",
-                currentDestination = LatLng(13.0827, 80.2707),
-                currentDestinationName = "Home",
-                pickupPeople = mutableListOf(sampleContact)
-            )
-
-            // Create custom message based on event type
-            val customMessage = when (eventType) {
-                "CHECKPOINT_REACHED" ->
-                    "✅ ${sampleTrip.traveler.name} has passed a checkpoint on their way to ${sampleTrip.currentDestinationName}."
-                "DESTINATION_NEARBY" ->
-                    "📍 ${sampleTrip.traveler.name} is approaching ${sampleTrip.currentDestinationName}. Almost there!"
-                "DESTINATION_REACHED" ->
-                    "🎯 ${sampleTrip.traveler.name} has arrived at ${sampleTrip.currentDestinationName}!"
-                else -> message
-            }
-
-            Log.d(TAG, "📱 Sending notifications to contacts...")
-
-            // Send notification to each contact
-            sampleTrip.pickupPeople.forEach { contact ->
-                val success = notificationManager.notifyContact(
-                    contact = contact,
-                    message = customMessage,
-                    trip = sampleTrip,
-                    eventType = eventType
-                )
-
-                if (success) {
-                    Log.d(TAG, "✅ Notified: ${contact.name} via ${contact.primaryMethod}")
-                } else {
-                    Log.w(TAG, "⚠️ Failed to notify: ${contact.name}")
-                }
-            }
-
-            Log.d(TAG, "")
-            Log.d(TAG, "✅ Contact notifications sent")
-            Log.d(TAG, "")
-
+            context.startActivity(intent)
+            Log.d(TAG, "✅ Alarm activity launched")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Error sending notifications: ${e.message}")
+            Log.e(TAG, "❌ Failed to launch alarm: ${e.message}")
             e.printStackTrace()
         }
     }

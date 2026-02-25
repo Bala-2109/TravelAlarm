@@ -51,6 +51,7 @@ class LocationService : Service() {
         activeTripTracker = ActiveTripTracker(this)
 
         setupLocationCallback()
+        setupTripCallbacks()
         createNotificationChannel()
     }
 
@@ -64,6 +65,22 @@ class LocationService : Service() {
         }
 
         Log.d(TAG, "✅ Location callback setup complete")
+    }
+
+    private fun setupTripCallbacks() {
+        // Callback when checkpoint is reached
+        activeTripTracker.setOnCheckpointReached { checkpoint, index ->
+            Log.d(TAG, "🎯 CHECKPOINT ${index + 1} REACHED: ${checkpoint.name}")
+            showCheckpointNotification(checkpoint.name, index + 1)
+        }
+
+        // Callback when destination is reached
+        activeTripTracker.setOnDestinationReached {
+            Log.d(TAG, "🏁 DESTINATION REACHED!")
+            showDestinationNotification()
+        }
+
+        Log.d(TAG, "✅ Trip callbacks setup complete")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -146,23 +163,71 @@ class LocationService : Service() {
         Log.d(TAG, "   Longitude: ${location.longitude}")
         Log.d(TAG, "   Accuracy:  ${location.accuracy}m")
 
-        // Update trip tracking
-        activeTripTracker.updateLocation(location)
+        // Update trip tracking and get progress
+        val progress = activeTripTracker.updateLocation(location)
 
-        // Get trip progress
-        val progress = activeTripTracker.getCurrentProgress()
-        val tripInfo = if (progress != null) {
-            "Trip: ${progress.name}\n" +
-                    "Progress: ${progress.currentCheckpointIndex}/${progress.totalCheckpoints} checkpoints\n" +
-                    "Distance: ${progress.distanceToDestination.toInt()}m"
+        // Create notification content
+        val notificationContent = if (progress != null) {
+            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d(TAG, "🗺️ TRIP PROGRESS")
+            Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            Log.d(TAG, "Trip: ${progress.tripName}")
+            Log.d(TAG, "Next: ${progress.nextCheckpointName}")
+            Log.d(TAG, "Distance to next: ${progress.formatDistanceToNextCheckpoint()}")
+            Log.d(TAG, "Distance to destination: ${progress.formatDistanceToDestination()}")
+            Log.d(TAG, "Progress: ${progress.currentCheckpointIndex}/${progress.totalCheckpoints} (${progress.progressPercentage}%)")
+
+            buildString {
+                append("🗺️ ${progress.tripName}\n")
+                append("📍 Next: ${progress.nextCheckpointName}\n")
+                append("📏 Distance: ${progress.formatDistanceToNextCheckpoint()}\n")
+                append("🎯 To destination: ${progress.formatDistanceToDestination()}\n")
+                append("📊 Progress: ${progress.currentCheckpointIndex}/${progress.totalCheckpoints} (${progress.progressPercentage}%)")
+            }
         } else {
-            "No active trip\n" +
-                    "Lat: ${String.format("%.4f", location.latitude)}\n" +
-                    "Lng: ${String.format("%.4f", location.longitude)}"
+            buildString {
+                append("No active trip\n")
+                append("📍 Lat: ${String.format("%.4f", location.latitude)}\n")
+                append("📍 Lng: ${String.format("%.4f", location.longitude)}")
+            }
         }
 
-        updateNotification(tripInfo)
+        updateNotification(notificationContent)
         Log.d(TAG, "✅ Location update processed successfully")
+    }
+
+    private fun showCheckpointNotification(checkpointName: String, index: Int) {
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("🎯 Checkpoint Reached!")
+            .setContentText("You've reached $checkpointName (${index})")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "Checkpoint ${index}: $checkpointName\n\n" +
+                        "Great progress! Keep going to your destination."
+            ))
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(2000 + index, notification)
+    }
+
+    private fun showDestinationNotification() {
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("🏁 Destination Reached!")
+            .setContentText("You've arrived at your destination!")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "Congratulations! You've successfully reached your destination.\n\n" +
+                        "Trip completed!"
+            ))
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(3000, notification)
     }
 
     private fun stopLocationUpdates() {
@@ -217,8 +282,7 @@ class LocationService : Service() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .build()
+            .setOngoing(true).build()
     }
 
     private fun updateNotification(content: String) {

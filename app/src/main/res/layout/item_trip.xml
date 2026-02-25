@@ -31,7 +31,7 @@
 
             <!-- Trip Name -->
             <TextView
-                android:id="@+id/tvName"
+                android:id="@+id/tvTripName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
@@ -57,7 +57,7 @@
                 android:textSize="14sp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvName" />
+                app:layout_constraintTop_toBottomOf="@id/tvTripName" />
 
             <!-- Checkpoint Count -->
             <TextView
@@ -69,7 +69,7 @@
                 android:textColor="@android:color/darker_gray"
                 android:textSize="12sp"
                 app:layout_constraintStart_toStartOf="parent"
-                app.layout_constraintTop_toBottomOf="@id/tvDestination" />
+                app:layout_constraintTop_toBottomOf="@id/tvDestination" />
 
             <!-- Divider -->
             <View

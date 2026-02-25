@@ -1,5 +1,8 @@
 package com.travelapp.alarm.data.model
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 /**
  * Notification method for contacts
  */
@@ -25,6 +28,7 @@ enum class NotificationFrequency {
 /**
  * Represents a contact who will pick up the traveler
  */
+@Parcelize
 data class Contact(
     val id: String,
     val name: String,
@@ -52,7 +56,7 @@ data class Contact(
 
     val createdAt: Long = System.currentTimeMillis(),
     val lastNotified: Long? = null
-) {
+) : Parcelable {
     fun shouldNotifyOnUpdate(updateCounter: Int, method: NotificationMethod): Boolean {
         val frequency = when (method) {
             NotificationMethod.WHATSAPP -> whatsappFrequency

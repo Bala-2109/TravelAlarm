@@ -4,7 +4,6 @@ import android.content.Context
 import android.location.Location
 import android.util.Log
 import com.travelapp.alarm.data.model.Checkpoint
-import com.travelapp.alarm.data.model.LatLng
 import com.travelapp.alarm.data.model.Trip
 import com.travelapp.alarm.manager.TripManager
 
@@ -19,9 +18,10 @@ class ActiveTripTracker(private val context: Context) {
     private var activeTrip: Trip? = null
     private var currentCheckpointIndex = 0
 
-    private var onCheckpointReached: ((Checkpoint) -> Unit)? = null
+    // Callbacks
+    private var onCheckpointReached: ((com.travelapp.alarm.data.model.Trip.Checkpoint, Int) -> Unit)? = null
     private var onDestinationReached: (() -> Unit)? = null
-    private var onProgressUpdate: ((TripProgress) -> Unit)? = null
+    private var onProgressUpdate: ((TripProgressInfo) -> Unit)? = null
 
     companion object {
         private const val TAG = "ActiveTripTracker"
@@ -63,76 +63,79 @@ class ActiveTripTracker(private val context: Context) {
     /**
      * Update current location and check progress
      */
-    fun updateLocation(location: Location) {
-        val trip = activeTrip ?: return
+    fun updateLocation(location: Location): TripProgressInfo? {
+        val trip = activeTrip ?: return null
 
-        Log.d(TAG, "📍 Location update - Lat: ${location.latitude}, Lng: ${location.longitude}")
+        Log.d(TAG, "📍 Updating location for trip: ${trip.name}")
+
+        var distanceToNextCheckpoint = 0f
+        var nextCheckpointName = "Destination"
 
         // Check if at current checkpoint
         if (currentCheckpointIndex < trip.checkpoints.size) {
             val checkpoint = trip.checkpoints[currentCheckpointIndex]
-            val distanceToCheckpoint = calculateDistance(
+            distanceToNextCheckpoint = calculateDistance(
                 location.latitude,
                 location.longitude,
-                checkpoint.location.latitude,
-                checkpoint.location.longitude
+                checkpoint.latitude,
+                checkpoint.longitude
             )
 
-            Log.d(TAG, "📏 Distance to checkpoint ${currentCheckpointIndex + 1}: ${distanceToCheckpoint.toInt()}m")
+            nextCheckpointName = checkpoint.name
 
-            if (distanceToCheckpoint <= CHECKPOINT_RADIUS_METERS) {
-                onCheckpointReachedInternal(checkpoint)
+            Log.d(TAG, "📏 Distance to ${checkpoint.name}: ${distanceToNextCheckpoint.toInt()}m")
+
+            // Check if reached checkpoint
+            if (distanceToNextCheckpoint <= CHECKPOINT_RADIUS_METERS) {
+                onCheckpointReachedInternal(checkpoint, currentCheckpointIndex)
             }
         }
 
-        // Check distance to final destination
-        val distanceToDestination = calculateDistance(
-            location.latitude,
-            location.longitude,
-            trip.currentDestination.latitude,
-            trip.currentDestination.longitude
-        )
+        // Calculate distance to final destination
+        val distanceToDestination = trip.currentDestination?.let {
+            calculateDistance(
+                location.latitude,
+                location.longitude,
+                it.latitude,
+                it.longitude
+            )
+        } ?: 0f
 
         Log.d(TAG, "📏 Distance to destination: ${distanceToDestination.toInt()}m")
 
+        // Check if reached destination
         if (distanceToDestination <= DESTINATION_RADIUS_METERS) {
             onDestinationReachedInternal()
         }
 
-        // Send progress update
-        val progress = TripProgress(
-            name = trip.name,
+        // Create progress info
+        val progressInfo = TripProgressInfo(
+            tripName = trip.name,
             currentCheckpointIndex = currentCheckpointIndex,
             totalCheckpoints = trip.checkpoints.size,
-            distanceToNextCheckpoint = if (currentCheckpointIndex < trip.checkpoints.size) {
-                calculateDistance(
-                    location.latitude,
-                    location.longitude,
-                    trip.checkpoints[currentCheckpointIndex].location.latitude,
-                    trip.checkpoints[currentCheckpointIndex].location.longitude
-                )
-            } else {
-                distanceToDestination
-            },
+            nextCheckpointName = nextCheckpointName,
+            distanceToNextCheckpoint = distanceToNextCheckpoint,
             distanceToDestination = distanceToDestination,
-            isAtCheckpoint = false,
-            isAtDestination = distanceToDestination <= DESTINATION_RADIUS_METERS
+            progressPercentage = calculateProgressPercentage()
         )
 
-        onProgressUpdate?.invoke(progress)
+        // Notify listeners
+        onProgressUpdate?.invoke(progressInfo)
+
+        return progressInfo
     }
 
-    private fun onCheckpointReachedInternal(checkpoint: Checkpoint) {
+    private fun onCheckpointReachedInternal(checkpoint: com.travelapp.alarm.data.model.Trip.Checkpoint, index: Int) {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.d(TAG, "✅ CHECKPOINT REACHED: ${checkpoint.name}")
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        onCheckpointReached?.invoke(checkpoint)
+        onCheckpointReached?.invoke(checkpoint, index)
         currentCheckpointIndex++
 
         Log.d(TAG, "📊 Progress: $currentCheckpointIndex/${activeTrip!!.checkpoints.size} checkpoints")
     }
-
+
     private fun onDestinationReachedInternal() {
         Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         Log.d(TAG, "🎯 DESTINATION REACHED!")
@@ -156,26 +159,26 @@ class ActiveTripTracker(private val context: Context) {
     }
 
     /**
-     * Get current trip progress
+     * Calculate progress percentage
      */
-    fun getCurrentProgress(): TripProgress? {
-        val trip = activeTrip ?: return null
-
-        return TripProgress(
-            name = trip.name,
-            currentCheckpointIndex = currentCheckpointIndex,
-            totalCheckpoints = trip.checkpoints.size,
-            distanceToNextCheckpoint = 0f,
-            distanceToDestination = 0f,
-            isAtCheckpoint = false,
-            isAtDestination = false
-        )
+    private fun calculateProgressPercentage(): Int {
+        val trip = activeTrip ?: return 0
+        return if (trip.checkpoints.size > 0) {
+            ((currentCheckpointIndex.toFloat() / trip.checkpoints.size) * 100).toInt()
+        } else {
+            0
+        }
     }
+
+    /**
+     * Get active trip
+     */
+    fun getActiveTrip(): Trip? = activeTrip
 
     /**
      * Set callback for checkpoint reached
      */
-    fun setOnCheckpointReached(callback: (Checkpoint) -> Unit) {
+    fun setOnCheckpointReached(callback: (com.travelapp.alarm.data.model.Trip.Checkpoint, Int) -> Unit) {
         onCheckpointReached = callback
     }
 
@@ -189,41 +192,36 @@ class ActiveTripTracker(private val context: Context) {
     /**
      * Set callback for progress updates
      */
-    fun setOnProgressUpdate(callback: (TripProgress) -> Unit) {
+    fun setOnProgressUpdate(callback: (TripProgressInfo) -> Unit) {
         onProgressUpdate = callback
     }
-
-    /**
-     * Get active trip
-     */
-    fun getActiveTrip(): Trip? = activeTrip
 }
 
 /**
- * Trip progress data
+ * Simple trip progress information
  */
-data class TripProgress(
-    val name: String,
+data class TripProgressInfo(
+    val tripName: String,
     val currentCheckpointIndex: Int,
     val totalCheckpoints: Int,
+    val nextCheckpointName: String,
     val distanceToNextCheckpoint: Float,
     val distanceToDestination: Float,
-    val isAtCheckpoint: Boolean,
-    val isAtDestination: Boolean
+    val progressPercentage: Int
 ) {
-    fun getNextCheckpointName(): String {
-        return if (currentCheckpointIndex < totalCheckpoints) {
-            "Checkpoint ${currentCheckpointIndex + 1}"
+    fun formatDistanceToNextCheckpoint(): String {
+        return if (distanceToNextCheckpoint < 1000) {
+            "${distanceToNextCheckpoint.toInt()}m"
         } else {
-            "Destination"
+            String.format("%.1fkm", distanceToNextCheckpoint / 1000)
         }
     }
 
-    fun getProgressPercentage(): Int {
-        return if (totalCheckpoints > 0) {
-            ((currentCheckpointIndex.toFloat() / totalCheckpoints) * 100).toInt()
+    fun formatDistanceToDestination(): String {
+        return if (distanceToDestination < 1000) {
+            "${distanceToDestination.toInt()}m"
         } else {
-            0
+            String.format("%.1fkm", distanceToDestination / 1000)
         }
     }
 }
